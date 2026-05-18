@@ -1,2 +1,19 @@
 # InsightFlow
-This project builds a data engineering pipeline using simulated IoT skincare data. A Python script generates records such as skin moisture, sebum levels, pH, and skin concerns. The data is stored, processed, and analyzed to identify patterns and support customer segmentation for personalized skincare insights
+
+Cloud-native IoT analytics pipeline using FastAPI, AWS S3, Glue, Athena, and interactive dashboards.
+
+## Features
+- IoT data simulation
+- ETL validation pipeline
+- Dashboard analytics
+- Athena SQL querying
+- AWS S3 data lake
+- Real-time KPI visualization
+
+## Tech Stack
+- Python
+- FastAPI
+- AWS S3
+- AWS Glue
+- AWS Athena
+- Chart.js
