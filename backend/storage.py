@@ -9,8 +9,8 @@ from config import TRANSFORMED_DATA_FILE, BASE_DIR
 from datetime import datetime
 
 # AWS S3 Configuration
-S3_BUCKET_RAW = "insightflow-raw-lake"  # Change to your bucket name
-S3_BUCKET_PROCESSED = "insightflow-processed-lake"  # Change to your bucket name
+S3_BUCKET_RAW = "insightflow-raw-ruchir"  # Change to your bucket name
+S3_BUCKET_PROCESSED = "insightflow-processed-ruchir"  # Change to your bucket name
 S3_PREFIX_RAW = "raw/"
 S3_PREFIX_PROCESSED = "processed/"
 
