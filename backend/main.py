@@ -34,31 +34,21 @@ from validation import validate_records, save_validation_log
 from transform import transform_records, save_transformed_data
 
 # ==========================================
-# OPTIONAL AWS MODULES
+# AWS MODULES
 # ==========================================
 
-try:
+from storage import save_to_data_lake
 
-    from storage import save_to_data_lake
+from athena import (
+    execute_query,
+    get_query_results,
+    run_predefined_query
+)
 
-    from athena import (
-        execute_query,
-        get_query_results,
-        run_predefined_query
-    )
-
-    from crawler import (
-        run_glue_crawler,
-        get_crawler_status
-    )
-
-    AWS_AVAILABLE = True
-
-except Exception as e:
-
-    print(f"⚠️ AWS modules not available: {e}")
-
-    AWS_AVAILABLE = False
+from crawler import (
+    run_glue_crawler,
+    get_crawler_status
+)
 
 # ==========================================
 # FASTAPI APP
@@ -150,17 +140,13 @@ def calculate_dashboard_kpis(transformed_records: List[Dict]) -> Dict:
     ]
 
     skin_state_breakdown = {}
-
     concern_breakdown = {}
-
     product_count = {}
 
     for record in transformed_records:
 
         state = record.get("skin_state", "Unknown")
-
         concern = record.get("primary_concern", "Unknown")
-
         product = record.get("suggested_product", "Unknown")
 
         skin_state_breakdown[state] = (
@@ -246,8 +232,6 @@ async def health():
         "status": "ok",
         "message": "InsightFlow API is running",
 
-        "aws_available": AWS_AVAILABLE,
-
         "aws_region": AWS_REGION,
 
         "raw_bucket": RAW_BUCKET,
@@ -270,13 +254,10 @@ async def generate_and_process():
 
     try:
 
-        # Generate
         fault_summary, records = generate_data()
 
-        # Ingest
         raw_records = ingest_data()
 
-        # Validate
         valid_records, invalid_records = validate_records(raw_records)
 
         save_validation_log(
@@ -284,7 +265,6 @@ async def generate_and_process():
             invalid_records
         )
 
-        # Transform
         transformed_records = transform_records(valid_records)
 
         save_transformed_data(transformed_records)
@@ -371,13 +351,6 @@ async def get_dashboard_kpis():
 @app.post("/api/s3/upload")
 async def upload_to_s3():
 
-    if not AWS_AVAILABLE:
-
-        return {
-            "status": "error",
-            "message": "AWS not configured"
-        }
-
     try:
 
         with open(TRANSFORMED_DATA_FILE, "r") as f:
@@ -402,13 +375,6 @@ async def upload_to_s3():
 @app.post("/api/crawler/run")
 async def run_crawler():
 
-    if not AWS_AVAILABLE:
-
-        return {
-            "status": "error",
-            "message": "AWS not configured"
-        }
-
     try:
 
         return run_glue_crawler()
@@ -422,13 +388,6 @@ async def run_crawler():
 
 @app.get("/api/crawler/status")
 async def crawler_status():
-
-    if not AWS_AVAILABLE:
-
-        return {
-            "status": "error",
-            "message": "AWS not configured"
-        }
 
     try:
 
@@ -447,13 +406,6 @@ async def crawler_status():
 
 @app.post("/api/query")
 async def run_query(sql: str = Query(...)):
-
-    if not AWS_AVAILABLE:
-
-        return {
-            "status": "error",
-            "message": "AWS not configured"
-        }
 
     try:
 
@@ -486,13 +438,6 @@ async def run_query(sql: str = Query(...)):
 
 @app.get("/api/query/predefined")
 async def predefined_query(query_name: str):
-
-    if not AWS_AVAILABLE:
-
-        return {
-            "status": "error",
-            "message": "AWS not configured"
-        }
 
     try:
 
