@@ -1,50 +1,53 @@
 """
-AWS Glue Crawler - Catalogs Parquet files in S3
-Automatically creates/updates table schema in Glue Catalog for Athena queries
+AWS Glue Crawler
+Catalogs Parquet files in S3
+Automatically updates Athena schema
 """
 
 import json
+import os
 import boto3
 from botocore.exceptions import ClientError
 
-# =========================================================
+# ==========================================
 # AWS CONFIGURATION
-# =========================================================
+# ==========================================
 
-# Change to ap-south-2 if using Hyderabad region
-AWS_REGION = "ap-south-1"
+AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 
 # Glue Database
-GLUE_DATABASE = "insightflow_db"
+GLUE_DATABASE = os.getenv("ATHENA_DATABASE", "insightflow_db")
 
-# Glue Crawler Name
-GLUE_CRAWLER_NAME = "skin_events_data"
+# Your crawler name
+GLUE_CRAWLER_NAME = os.getenv(
+    "GLUE_CRAWLER_NAME",
+    "skin_events_data"
+)
 
-# Your processed S3 bucket
-S3_BUCKET_PROCESSED = "insightflow-processed-ruchir"
+# Processed S3 bucket
+PROCESSED_BUCKET = os.getenv("PROCESSED_BUCKET")
 
 # S3 parquet path
-S3_TARGET_PATH = f"s3://{S3_BUCKET_PROCESSED}/"
+S3_TARGET_PATH = f"s3://{PROCESSED_BUCKET}/"
 
-# IMPORTANT:
-# Replace with your actual Glue Role ARN
-GLUE_ROLE_ARN = "arn:aws:iam::459640517326:role/InsightFlowGlueRole"
+# Glue IAM Role ARN
+GLUE_ROLE_ARN = os.getenv("GLUE_ROLE_ARN")
 
-# Table name expected in Athena
+# Athena table name
 GLUE_TABLE_NAME = "skin_events"
 
-# =========================================================
+# ==========================================
 # BOTO3 CLIENT
-# =========================================================
+# ==========================================
 
 glue_client = boto3.client(
     "glue",
     region_name=AWS_REGION
 )
 
-# =========================================================
+# ==========================================
 # CREATE GLUE DATABASE
-# =========================================================
+# ==========================================
 
 def create_glue_database():
 
@@ -75,14 +78,27 @@ def create_glue_database():
 
             return False
 
-
-# =========================================================
+# ==========================================
 # CREATE GLUE CRAWLER
-# =========================================================
+# ==========================================
 
 def create_glue_crawler():
 
     try:
+
+        if not PROCESSED_BUCKET:
+
+            return {
+                "status": "error",
+                "message": "PROCESSED_BUCKET environment variable not set"
+            }
+
+        if not GLUE_ROLE_ARN:
+
+            return {
+                "status": "error",
+                "message": "GLUE_ROLE_ARN environment variable not set"
+            }
 
         print(f"🔍 Scanning path: {S3_TARGET_PATH}")
 
@@ -115,7 +131,10 @@ def create_glue_crawler():
 
         print(f"✅ Created crawler: {GLUE_CRAWLER_NAME}")
 
-        return True
+        return {
+            "status": "success",
+            "message": f"Crawler {GLUE_CRAWLER_NAME} created successfully"
+        }
 
     except ClientError as e:
 
@@ -123,18 +142,23 @@ def create_glue_crawler():
 
             print(f"ℹ️ Crawler already exists: {GLUE_CRAWLER_NAME}")
 
-            return True
+            return {
+                "status": "success",
+                "message": "Crawler already exists"
+            }
 
         else:
 
             print(f"❌ Failed to create crawler: {e}")
 
-            return False
+            return {
+                "status": "error",
+                "message": str(e)
+            }
 
-
-# =========================================================
+# ==========================================
 # RUN GLUE CRAWLER
-# =========================================================
+# ==========================================
 
 def run_glue_crawler():
 
@@ -164,17 +188,14 @@ def run_glue_crawler():
                 "message": "Crawler already running"
             }
 
-        else:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
-            return {
-                "status": "error",
-                "message": str(e)
-            }
-
-
-# =========================================================
+# ==========================================
 # GET CRAWLER STATUS
-# =========================================================
+# ==========================================
 
 def get_crawler_status():
 
@@ -190,7 +211,8 @@ def get_crawler_status():
             "status": "success",
             "crawler_name": crawler["Name"],
             "state": crawler["State"],
-            "database": crawler["DatabaseName"]
+            "database": crawler["DatabaseName"],
+            "targets": crawler["Targets"]
         }
 
     except ClientError as e:
@@ -200,86 +222,18 @@ def get_crawler_status():
             "message": str(e)
         }
 
-
-# =========================================================
-# LIST GLUE TABLES
-# =========================================================
-
-def list_cataloged_tables():
-
-    try:
-
-        response = glue_client.get_tables(
-            DatabaseName=GLUE_DATABASE
-        )
-
-        tables = response.get("TableList", [])
-
-        table_list = []
-
-        for table in tables:
-
-            table_info = {
-                "name": table["Name"],
-                "location": table["StorageDescriptor"]["Location"],
-                "columns": len(table["StorageDescriptor"]["Columns"])
-            }
-
-            table_list.append(table_info)
-
-        return {
-            "status": "success",
-            "database": GLUE_DATABASE,
-            "table_count": len(table_list),
-            "tables": table_list
-        }
-
-    except ClientError as e:
-
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
-
-# =========================================================
-# COMPLETE SETUP FLOW
-# =========================================================
-
-def setup_and_run_crawler():
-
-    print("\n🚀 Setting up Glue crawler...\n")
-
-    # Step 1 → Create Database
-    if not create_glue_database():
-
-        return {
-            "status": "error",
-            "message": "Failed to create Glue database"
-        }
-
-    # Step 2 → Create Crawler
-    if not create_glue_crawler():
-
-        return {
-            "status": "error",
-            "message": "Failed to create crawler"
-        }
-
-    # Step 3 → Run Crawler
-    result = run_glue_crawler()
-
-    return result
-
-
-# =========================================================
-# MAIN EXECUTION
-# =========================================================
+# ==========================================
+# MAIN TEST
+# ==========================================
 
 if __name__ == "__main__":
 
-    result = setup_and_run_crawler()
+    print("\n========== GLUE CRAWLER TEST ==========\n")
 
-    print("\n📊 RESULT:\n")
+    create_glue_database()
+
+    create_glue_crawler()
+
+    result = run_glue_crawler()
 
     print(json.dumps(result, indent=2))

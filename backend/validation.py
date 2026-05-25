@@ -1,106 +1,299 @@
-import json
-from config import REQUIRED_FIELDS, VALIDATION_RULES, VALIDATION_LOG_FILE
+"""
+InsightFlow Validation Module
+Validates IoT skin analytics records
+"""
 
+import json
+
+from config import (
+    REQUIRED_FIELDS,
+    VALIDATION_RULES,
+    VALIDATION_LOG_FILE
+)
+
+# ==========================================
+# VALIDATE SINGLE RECORD
+# ==========================================
 
 def validate_record(record):
     """
-    Validate a single record.
-    Returns: (is_valid, error_message)
-    """
-    # Check required top-level fields
-    for field in REQUIRED_FIELDS:
-        if field not in record:
-            return False, f"MISSING_REQUIRED_FIELD: {field}"
-        if record[field] is None:
-            return False, f"NULL_FIELD: {field}"
+    Validate one IoT record
 
-    # Check reading object
+    Returns:
+        (True, None)
+        OR
+        (False, error_message)
+    """
+
+    # ======================================
+    # REQUIRED FIELDS
+    # ======================================
+
+    for field in REQUIRED_FIELDS:
+
+        if field not in record:
+
+            return (
+                False,
+                f"MISSING_REQUIRED_FIELD: {field}"
+            )
+
+        if record[field] is None:
+
+            return (
+                False,
+                f"NULL_FIELD: {field}"
+            )
+
+    # ======================================
+    # READING OBJECT
+    # ======================================
+
     if not isinstance(record.get("reading"), dict):
-        return False, f"INVALID_READING: not a dict"
+
+        return (
+            False,
+            "INVALID_READING: must be object"
+        )
 
     reading = record["reading"]
 
-    # Type checks
+    # ======================================
+    # TYPE CHECKS
+    # ======================================
+
     if not isinstance(record.get("device_id"), str):
-        return False, f"WRONG_TYPE: device_id must be string, got {type(record.get('device_id')).__name__}"
+
+        return (
+            False,
+            f"WRONG_TYPE: device_id must be string"
+        )
+
     if not isinstance(record.get("customer_id"), str):
-        return False, f"WRONG_TYPE: customer_id must be string, got {type(record.get('customer_id')).__name__}"
+
+        return (
+            False,
+            f"WRONG_TYPE: customer_id must be string"
+        )
+
     if not isinstance(record.get("timestamp"), str):
-        return False, f"WRONG_TYPE: timestamp must be string"
 
-    # ID format validation
+        return (
+            False,
+            "WRONG_TYPE: timestamp must be string"
+        )
+
+    # ======================================
+    # ID FORMAT VALIDATION
+    # ======================================
+
     if not record.get("device_id", "").startswith("SKIN-PRO-"):
-        return False, f"MALFORMED_ID: device_id must start with 'SKIN-PRO-'"
-    if not record.get("customer_id", "").startswith("USER-"):
-        return False, f"MALFORMED_ID: customer_id must start with 'USER-'"
 
-    # Sensor range validation
+        return (
+            False,
+            "MALFORMED_ID: invalid device_id"
+        )
+
+    if not record.get("customer_id", "").startswith("USER-"):
+
+        return (
+            False,
+            "MALFORMED_ID: invalid customer_id"
+        )
+
+    # ======================================
+    # SENSOR VALIDATION
+    # ======================================
+
     for field, rules in VALIDATION_RULES.items():
+
         if field not in reading:
-            return False, f"MISSING_SENSOR_FIELD: {field}"
+
+            return (
+                False,
+                f"MISSING_SENSOR_FIELD: {field}"
+            )
+
         val = reading[field]
+
         if val is None:
-            return False, f"NULL_SENSOR_VALUE: {field}"
+
+            return (
+                False,
+                f"NULL_SENSOR_VALUE: {field}"
+            )
+
         if not isinstance(val, (int, float)):
-            return False, f"WRONG_TYPE: {field} must be numeric, got {type(val).__name__}"
+
+            return (
+                False,
+                f"WRONG_TYPE: {field} must be numeric"
+            )
+
         if not (rules["min"] <= val <= rules["max"]):
-            return False, f"OUT_OF_RANGE: {field}={val} (valid: {rules['min']}-{rules['max']})"
+
+            return (
+                False,
+                f"OUT_OF_RANGE: {field}={val}"
+            )
 
     return True, None
 
+# ==========================================
+# VALIDATE MULTIPLE RECORDS
+# ==========================================
 
 def validate_records(records):
     """
-    Validate all records.
-    Returns: (valid_records, invalid_records_with_errors)
+    Validate all records
+
+    Returns:
+        valid_records
+        invalid_records
     """
+
     valid = []
+
     invalid = []
-    seen = set()  # For duplicate detection
 
-    for i, record in enumerate(records):
-        is_valid, error = validate_record(record)
+    seen = set()
 
-        if is_valid:
-            # Check for duplicates
-            key = json.dumps(record, sort_keys=True)
-            if key in seen:
+    for index, record in enumerate(records):
+
+        try:
+
+            is_valid, error = validate_record(record)
+
+            if is_valid:
+
+                # ==================================
+                # DUPLICATE DETECTION
+                # ==================================
+
+                key = json.dumps(
+                    record,
+                    sort_keys=True
+                )
+
+                if key in seen:
+
+                    invalid.append({
+
+                        "index": index,
+
+                        "record": record,
+
+                        "error": "DUPLICATE_RECORD",
+
+                        "hint": record.get(
+                            "_fault",
+                            ""
+                        )
+                    })
+
+                    continue
+
+                seen.add(key)
+
+                valid.append(record)
+
+            else:
+
                 invalid.append({
-                    "index": i,
+
+                    "index": index,
+
                     "record": record,
-                    "error": "DUPLICATE_RECORD",
-                    "hint": record.get("_fault", "")
+
+                    "error": error,
+
+                    "hint": record.get(
+                        "_fault",
+                        ""
+                    )
                 })
-                continue
-            seen.add(key)
-            valid.append(record)
-        else:
+
+        except Exception as e:
+
             invalid.append({
-                "index": i,
+
+                "index": index,
+
                 "record": record,
-                "error": error,
-                "hint": record.get("_fault", "")
+
+                "error": f"VALIDATION_EXCEPTION: {e}",
+
+                "hint": record.get(
+                    "_fault",
+                    ""
+                )
             })
+
+    print(f"\n{'─' * 60}")
+
+    print("🛡️ Validation Complete")
+
+    print(f"✅ Valid records: {len(valid)}")
+
+    print(f"❌ Invalid records: {len(invalid)}")
+
+    print(f"{'─' * 60}\n")
 
     return valid, invalid
 
+# ==========================================
+# SAVE VALIDATION LOG
+# ==========================================
 
 def save_validation_log(valid, invalid):
-    """Save validation summary to file"""
-    log = {
-        "valid_count": len(valid),
-        "invalid_count": len(invalid),
-        "total": len(valid) + len(invalid),
-        "invalid_records": invalid[:50],  # Save first 50 for debugging
-    }
-    with open(VALIDATION_LOG_FILE, "w") as f:
-        json.dump(log, f, indent=2, default=str)
-    print(f"[VALIDATION] Saved log to {VALIDATION_LOG_FILE}")
+    """Save validation summary"""
 
+    log = {
+
+        "valid_count": len(valid),
+
+        "invalid_count": len(invalid),
+
+        "total": len(valid) + len(invalid),
+
+        "invalid_records": invalid[:50]
+    }
+
+    try:
+
+        with open(VALIDATION_LOG_FILE, "w") as f:
+
+            json.dump(
+                log,
+                f,
+                indent=2,
+                default=str
+            )
+
+        print(
+            f"✅ Validation log saved → {VALIDATION_LOG_FILE}"
+        )
+
+    except Exception as e:
+
+        print(
+            f"❌ Failed saving validation log: {e}"
+        )
+
+# ==========================================
+# MAIN TEST
+# ==========================================
 
 if __name__ == "__main__":
+
     from ingestion import ingest_data
+
     records = ingest_data()
+
     valid, invalid = validate_records(records)
-    print(f"[VALIDATION] {len(valid)} valid, {len(invalid)} invalid")
+
     save_validation_log(valid, invalid)
+
+    print(
+        f"🚀 Validation complete: {len(valid)} valid / {len(invalid)} invalid"
+    )
