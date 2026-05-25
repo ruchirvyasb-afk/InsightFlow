@@ -207,9 +207,124 @@ header{position:sticky;top:0;z-index:200;height:58px;display:flex;align-items:ce
 .error-box{background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:10px;color:var(--red);margin-bottom:8px;display:none}
 
 .success-box{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:10px;color:#059669;margin-bottom:8px;display:none}
+
+/* === Day 3 UI Improvements === */
+.loader {
+    border: 6px solid rgba(255,255,255,0.2);
+    border-top: 6px solid #ffffff;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+}
+
+.hidden {
+    display: none;
+}
+
+@keyframes spin {
+    100% {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+.kpi-card {
+    background: rgba(255,255,255,0.08) !important;
+    border-radius: 18px !important;
+    padding: 22px !important;
+    backdrop-filter: blur(12px);
+    transition: 0.3s ease;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+button {
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    transition: 0.3s ease;
+    font-weight: 600;
+}
+
+button:hover {
+    transform: scale(1.05);
+    opacity: 0.9;
+}
+
+.pipeline-flow {
+    text-align: center;
+    margin: 20px 0;
+    font-size: 18px;
+    opacity: 0.85;
+    letter-spacing: 1px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    font-size: 42px;
+    font-weight: 800;
+}
+
+.header p {
+    opacity: 0.8;
+    font-size: 18px;
+}
+
+footer {
+    text-align: center;
+    margin-top: 40px;
+    padding: 20px;
+    opacity: 0.7;
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+
+    .kpi-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .chart-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    canvas {
+        width: 100% !important;
+    }
+
+    .sidebar {
+        width: 100%;
+    }
+
+    .topbar {
+        flex-direction: column;
+        gap: 10px;
+    }
+}
+
 </style>
 </head>
 <body>
+<div id="loader" class="loader hidden"></div>
+
+<div class="pipeline-flow">
+    Generate → Validate → Transform → Upload → Athena Analytics
+</div>
+
 
 <!-- HEADER -->
 <header>
@@ -453,7 +568,11 @@ header{position:sticky;top:0;z-index:200;height:58px;display:flex;align-items:ce
 </div>
 
 <script>
+<<<<<<< HEAD:frontend/insightflow_complete.html
 const API_BASE = 'https://insightflow-api-bqp0.onrender.com';
+=======
+const API_BASE = 'https://insightflow-api-bqp0.onrender.com/';
+>>>>>>> authentication-system:frontend/index.html
 let allTransformedData = [];
 let concernChart, stateChart, moistureChart, sebumChart;
 
@@ -786,5 +905,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('backendStatus').textContent = health.status === 'ok' ? 'Connected' : 'Offline';
 });
 </script>
+
+<footer>
+    InsightFlow v1.0
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const originalFetch = window.fetch;
+
+    window.fetch = async (...args) => {
+        try {
+            document.getElementById("loader")?.classList.remove("hidden");
+            const response = await originalFetch(...args);
+            return response;
+        } catch (error) {
+            console.error(error);
+            alert("API request failed");
+            throw error;
+        } finally {
+            document.getElementById("loader")?.classList.add("hidden");
+        }
+    };
+});
+</script>
+
 </body>
 </html>
