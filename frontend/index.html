@@ -839,15 +839,23 @@ function renderTopProducts(products) {
 
 // ===== AWS =====
 async function uploadToS3() {
-  alert('Upload to S3 requires AWS credentials to be configured.\nSee AWS_SETUP.md for instructions.');
-  // const result = await apiCall('/api/s3/upload', 'POST');
-  // showMessage('validCount', result.message, result.status);
+  const result = await apiCall('/api/s3/upload', 'POST');
+
+  if (result.status === 'success') {
+    alert(`✅ ${result.message}`);
+  } else {
+    alert(`❌ ${result.message}`);
+  }
 }
 
 async function runCrawler() {
-  alert('Glue Crawler requires AWS credentials to be configured.\nSee AWS_SETUP.md for instructions.');
-  // const result = await apiCall('/api/crawler/run', 'POST');
-  // showMessage('validCount', result.message, result.status);
+  const result = await apiCall('/api/crawler/run', 'POST');
+
+  if (result.status === 'success') {
+    alert(`✅ ${result.message}`);
+  } else {
+    alert(`❌ ${result.message}`);
+  }
 }
 
 // ===== ATHENA =====
