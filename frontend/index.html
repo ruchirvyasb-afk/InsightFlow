@@ -7,6 +7,8 @@
 <title>InsightFlow — IoT Skin Analytics</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root {
   --ink:        #0f0e17;
@@ -311,6 +313,12 @@ header {
 }
 .athena-dl-btn.json:hover { background: var(--amber); color: white; }
 .athena-dl-btns { display: flex; gap: 8px; }
+ 
+.athena-dl-btn.pdf {
+  background: var(--red-lt); color: var(--red);
+  border: 1.5px solid rgba(184,50,50,.25);
+}
+.athena-dl-btn.pdf:hover { background: var(--red); color: white; }
  
 /* EMPTY STATES */
 .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px; text-align:center; gap:10px; }
@@ -725,6 +733,9 @@ function displayQueryResults(results) {
           <button class="athena-dl-btn json" onclick="downloadQueryResults('json')" title="Download as JSON">
             ⬇ JSON
           </button>
+          <button class="athena-dl-btn pdf" onclick="downloadQueryResults('pdf')" title="Download as PDF">
+            ⬇ PDF
+          </button>
         </div>
       </div>
       <div class="athena-table-wrap">
@@ -743,6 +754,7 @@ function displayQueryResults(results) {
         <div class="athena-dl-btns">
           <button class="athena-dl-btn csv" onclick="downloadQueryResults('csv')">⬇ Download CSV</button>
           <button class="athena-dl-btn json" onclick="downloadQueryResults('json')">⬇ Download JSON</button>
+          <button class="athena-dl-btn pdf" onclick="downloadQueryResults('pdf')">⬇ Download PDF</button>
         </div>
       </div>
     </div>`;
@@ -764,6 +776,42 @@ function downloadQueryResults(format) {
   } else {
     blob = new Blob([JSON.stringify(_lastQueryResults, null, 2)], { type: 'application/json' });
     filename = `insightflow_query_${Date.now()}.json`;
+  }
+  if (format === 'pdf') {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const h = Object.keys(_lastQueryResults[0]);
+    // Header
+    doc.setFillColor(15, 14, 23);
+    doc.rect(0, 0, doc.internal.pageSize.getWidth(), 38, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(255, 255, 255);
+    doc.text('InsightFlow — Athena Query Results', 24, 24);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(180, 180, 180);
+    doc.text(`Exported ${new Date().toLocaleString()} · ${_lastQueryResults.length} rows · ${h.length} columns`, 24, 34);
+    // Table
+    doc.autoTable({
+      head: [h.map(k => k.replace(/_/g, ' ').toUpperCase())],
+      body: _lastQueryResults.map(r => h.map(k => r[k] ?? '—')),
+      startY: 46,
+      styles: { font: 'courier', fontSize: 7, cellPadding: 4, textColor: [15, 14, 23] },
+      headStyles: { fillColor: [26, 107, 90], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+      alternateRowStyles: { fillColor: [245, 242, 236] },
+      margin: { left: 24, right: 24 },
+      theme: 'grid',
+    });
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7); doc.setTextColor(150, 150, 150);
+      doc.text(`InsightFlow IoT Skin Analytics · Page ${i} of ${pageCount}`, 24, doc.internal.pageSize.getHeight() - 10);
+    }
+    doc.save(`insightflow_query_${Date.now()}.pdf`);
+    return;
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
