@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -261,6 +262,56 @@ header {
 }
 .hint-btn:hover { background:var(--ink); color:white; border-color:var(--ink); transform:translateY(-1px); }
 
+/* ATHENA TABLE — horizontal scroll */
+.athena-table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 420px;
+  border-radius: 0 0 10px 10px;
+  /* custom scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--canvas3) transparent;
+}
+.athena-table-wrap::-webkit-scrollbar { height: 7px; width: 7px; }
+.athena-table-wrap::-webkit-scrollbar-track { background: transparent; }
+.athena-table-wrap::-webkit-scrollbar-thumb { background: var(--canvas3); border-radius: 4px; }
+.athena-table-wrap::-webkit-scrollbar-thumb:hover { background: var(--muted2); }
+ 
+.athena-table-wrap .dtable { min-width: max-content; width: 100%; }
+ 
+/* Download / result toolbar */
+.athena-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--surface2);
+  border-top: 1.5px solid var(--border);
+  border-radius: 0 0 10px 10px;
+  gap: 10px; flex-wrap: wrap;
+}
+.athena-toolbar-left {
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.athena-toolbar-left strong { color: var(--text); }
+.athena-dl-btn {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.5px; text-transform: uppercase; font-weight: 600;
+  padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer;
+  transition: all .2s ease;
+}
+.athena-dl-btn.csv {
+  background: var(--accent-lt); color: var(--accent2);
+  border: 1.5px solid rgba(26,107,90,.25);
+}
+.athena-dl-btn.csv:hover { background: var(--accent); color: white; }
+.athena-dl-btn.json {
+  background: var(--amber-lt); color: var(--amber);
+  border: 1.5px solid rgba(184,116,34,.25);
+}
+.athena-dl-btn.json:hover { background: var(--amber); color: white; }
+.athena-dl-btns { display: flex; gap: 8px; }
+ 
 /* EMPTY STATES */
 .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px; text-align:center; gap:10px; }
 .es-icon { font-size:32px; opacity:0.3; }
@@ -640,13 +691,85 @@ async function runCrawler(){const r=await apiCall('/api/crawler/run','POST');ale
 async function runPredefinedQuery(type){const r=await apiCall(`/api/query/predefined/${type}`,'POST');if(r.status==='success'){displayQueryResults(r.results);showMessage('athenaSuccess',`Query '${type}' executed successfully`);}else showMessage('athenaError',r.message,'error');}
 async function executeCustomQuery(){const sql=document.getElementById('customSql').value.trim();if(!sql){showMessage('athenaError','Please enter a SQL query','error');return;}const r=await apiCall(`/api/query?sql=${encodeURIComponent(sql)}`,'POST');if(r.status==='success'){displayQueryResults(r.results);showMessage('athenaSuccess','Custom query executed');}else showMessage('athenaError',r.message,'error');}
 
+let _lastQueryResults = [];
+
 function displayQueryResults(results) {
-  const c=document.getElementById('queryResultsContainer');
-  if(!results||!results.length){c.innerHTML='<div class="es-sub" style="text-align:center;padding:20px">No results</div>';return;}
-  const h=Object.keys(results[0]);
-  let html='<div style="overflow-x:auto"><table class="dtable"><thead><tr>'+h.map(k=>`<th>${k}</th>`).join('')+'</tr></thead><tbody>';
-  results.slice(0,50).forEach(row=>{html+='<tr>'+h.map(k=>`<td>${row[k]??'—'}</td>`).join('')+'</tr>';});
-  html+='</tbody></table></div>'; c.innerHTML=html;
+  _lastQueryResults = results || [];
+  const c = document.getElementById('queryResultsContainer');
+  c.classList.remove('empty-state');
+  c.style.background = 'transparent';
+  c.style.border = 'none';
+  c.style.borderRadius = '0';
+  c.style.padding = '0';
+
+  if (!results || !results.length) {
+    c.innerHTML = '<div class="empty-state" style="background:var(--surface2);border-radius:10px;border:1.5px solid var(--border)"><div class="es-icon">🔍</div><div class="es-title">No Results</div><div class="es-sub">Query returned 0 rows.</div></div>';
+    return;
+  }
+
+  const h = Object.keys(results[0]);
+  const shown = results.slice(0, 100);
+
+  let html = `
+    <div class="panel" style="margin-top:0">
+      <div class="phdr" style="gap:10px">
+        <div class="ptitle">
+          <div class="pdot" style="background:var(--blue)"></div>
+          Query Results
+          <span class="ptag">${results.length} row${results.length!==1?'s':''} · ${h.length} col${h.length!==1?'s':''}</span>
+        </div>
+        <div class="athena-dl-btns">
+          <button class="athena-dl-btn csv" onclick="downloadQueryResults('csv')" title="Download as CSV">
+            ⬇ CSV
+          </button>
+          <button class="athena-dl-btn json" onclick="downloadQueryResults('json')" title="Download as JSON">
+            ⬇ JSON
+          </button>
+        </div>
+      </div>
+      <div class="athena-table-wrap">
+        <table class="dtable">
+          <thead><tr>${h.map(k=>`<th>${k.replace(/_/g,' ')}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${shown.map(row=>'<tr>'+h.map(k=>`<td>${row[k]??'—'}</td>`).join('')+'</tr>').join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="athena-toolbar">
+        <div class="athena-toolbar-left">
+          Showing <strong>${shown.length}</strong> of <strong>${results.length}</strong> rows
+          ${results.length > 100 ? '· <span style="color:var(--amber)">First 100 shown — download for full dataset</span>' : ''}
+        </div>
+        <div class="athena-dl-btns">
+          <button class="athena-dl-btn csv" onclick="downloadQueryResults('csv')">⬇ Download CSV</button>
+          <button class="athena-dl-btn json" onclick="downloadQueryResults('json')">⬇ Download JSON</button>
+        </div>
+      </div>
+    </div>`;
+
+  c.innerHTML = html;
+}
+
+function downloadQueryResults(format) {
+  if (!_lastQueryResults.length) return;
+  let blob, filename;
+  if (format === 'csv') {
+    const h = Object.keys(_lastQueryResults[0]);
+    const rows = [h.join(','), ..._lastQueryResults.map(r => h.map(k => {
+      const v = r[k] ?? '';
+      return typeof v === 'string' && (v.includes(',') || v.includes('"')) ? `"${v.replace(/"/g,'""')}"` : v;
+    }).join(','))];
+    blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    filename = `insightflow_query_${Date.now()}.csv`;
+  } else {
+    blob = new Blob([JSON.stringify(_lastQueryResults, null, 2)], { type: 'application/json' });
+    filename = `insightflow_query_${Date.now()}.json`;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 document.addEventListener('DOMContentLoaded',async()=>{
