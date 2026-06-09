@@ -296,11 +296,11 @@ async def generate_and_process():
 
             transformed_count=len(transformed_records),
 
-            raw_records=raw_records[:10],
+            raw_records=raw_records,
 
             validation_summary=validation_summary,
 
-            transformed_records=transformed_records[:10]
+            transformed_records=transformed_records
         )
 
     except Exception as e:
