@@ -2,7 +2,7 @@
 S3 Data Lake Storage
 Converts cleaned JSON to Parquet and uploads to S3 bucket
 """
-
+import boto3
 import json
 import os
 import pandas as pd
@@ -119,7 +119,27 @@ def upload_to_s3(df, bucket_name, s3_prefix, filename):
 # ==============================
 # MAIN DATA LAKE FUNCTION
 # ==============================
+def clear_processed_folder():
+    """Delete all parquet files from processed folder"""
 
+    try:
+        response = s3_client.list_objects_v2(
+            Bucket=PROCESSED_BUCKET,
+            Prefix=S3_PREFIX_PROCESSED
+        )
+
+        if "Contents" in response:
+            for obj in response["Contents"]:
+                s3_client.delete_object(
+                    Bucket=PROCESSED_BUCKET,
+                    Key=obj["Key"]
+                )
+
+            print("🗑️ Old parquet files deleted")
+
+    except Exception as e:
+        print(f"❌ Failed to clear processed folder: {e}")
+        
 def save_to_data_lake(records):
     """Convert transformed data to Parquet and upload to S3"""
 
@@ -134,6 +154,8 @@ def save_to_data_lake(records):
 
     # Convert records
     df = convert_to_parquet(records)
+    # Remove old parquet files first
+    clear_processed_folder()
 
     if df is None:
         return {
